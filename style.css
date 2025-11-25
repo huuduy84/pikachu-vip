@@ -223,7 +223,9 @@ body {
     box-shadow: 0 0 20px rgba(0,0,0,0.5);
     margin-top: 10px;
     flex-grow: 1;
-    overflow: hidden; /* Đảm bảo không bị tràn khi co dãn */
+    overflow: hidden; 
+    /* Sửa đổi: Căn các hàng vào giữa nếu còn khoảng trống (giúp giảm khoảng trống thừa) */
+    align-content: center; 
 }
 
 .tile {
@@ -284,7 +286,7 @@ body {
 /* === PHẦN RESPONSIVE === */
 /* ======================================================= */
 
-/* --- CẤU HÌNH DI ĐỘNG CHUNG (MÀN HÌNH DỌC) --- */
+/* --- CẤU HÌNH DI ĐỘNG CHUNG (MÀN HÌNH DỌC - PORTRAIT) --- */
 @media (max-width: 768px) {
     .game-header {
         padding: 10px;
@@ -327,14 +329,14 @@ body {
         padding: 4px 8px;
     }
     
-    /* FIX: Sử dụng VW để scale tốt hơn trong màn hình dọc */
+    /* Sửa đổi: Tăng VW để scale tốt hơn trong màn hình dọc và lấp đầy khoảng trống */
     .tile-easy, .tile-medium { 
-        width: 9vw; /* Điều chỉnh để vừa vặn hơn trên hầu hết các điện thoại */
+        width: 9vw; /* Tăng từ 8.5vw/8vw lên 9vw */
         height: 9vw; 
         margin: 0.5px; 
     }
     .tile-hard { 
-        width: 6vw; 
+        width: 6vw; /* Tăng từ 5.8vw/5.5vw lên 6vw */
         height: 6vw; 
         margin: 0.5px; 
     }
