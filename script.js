@@ -9,10 +9,19 @@ $(document).ready(function() {
     const HINT_COST = 50; 
     const SHUFFLE_COST = 100;
 
+    // >>> SỬA LỖI 1: THÊM LẠI CẤU HÌNH SKIN BỊ MẤT
+    const SKINS = {
+        'pokemon': { folder: '', name_vi: 'Pokemon Cổ Điển' }, // Chủ đề MẶC ĐỊNH (Thư mục gốc images/)
+        'animal': { folder: 'animal/', name_vi: 'Động Vật (Thú)' },    // Chủ đề 2 (Thư mục images/animal/)
+        'food': { folder: 'food/', name_vi: 'Đồ Ăn' }   // Chủ đề 3 (Thư mục images/food/)
+    };
+    
     const BACKGROUNDS = [
         'images/bg1.jpg',
         'images/bg2.jpg',
         'images/bg3.jpg', 
+        'images/bg4.jpg',
+        'images/bg5.jpg',
         'images/pokemon_bg.jpg'
     ];
     const MAIN_MENU_BG = 'images/main_bg.jpg';
@@ -29,7 +38,9 @@ $(document).ready(function() {
             play_again: "CHƠI LẠI", exit: "THOÁT", notif_hint_cost: `Bạn cần ${HINT_COST} điểm để Gợi ý.`,
             notif_hint_used: `💡 Đã trừ ${HINT_COST} điểm.`, notif_shuffle_cost: `Bạn cần ${SHUFFLE_COST} điểm để Xáo trộn.`,
             notif_shuffle_used: `🔀 Đã trừ ${SHUFFLE_COST} điểm.`, notif_no_move: "Hết nước đi! Tự động Xáo trộn.",
-            notif_saved: "💾 Đã lưu game thành công!"
+            notif_saved: "💾 Đã lưu game thành công!",
+            // THÊM THUỘC TÍNH BỊ THIẾU
+            theme_setting: "Chủ Đề (Skin)"
         },
         en: {
             resume: "RESUME", new_game: "NEW GAME", score: "Score", hint: "Hint", shuffle: "Shuffle",
@@ -42,7 +53,9 @@ $(document).ready(function() {
             play_again: "TRY AGAIN", exit: "EXIT", notif_hint_cost: `Need ${HINT_COST} points for Hint.`,
             notif_hint_used: `💡 -${HINT_COST} points.`, notif_shuffle_cost: `Need ${SHUFFLE_COST} points for Shuffle.`,
             notif_shuffle_used: `🔀 -${SHUFFLE_COST} points.`, notif_no_move: "No moves left! Auto Shuffling.",
-            notif_saved: "💾 Game Saved!"
+            notif_saved: "💾 Game Saved!",
+            // THÊM THUỘC TÍNH BỊ THIẾU
+            theme_setting: "Theme (Skin)"
         }
     };
 
@@ -65,9 +78,12 @@ $(document).ready(function() {
     let maxTime = 0; 
     let timerInterval;
     let isProcessing = false;
+    
+    // >>> THÊM BIẾN TRẠNG THÁI SKIN MẶC ĐỊNH
+    let currentSkin = 'pokemon'; 
 
     // ==========================================
-    // 2. SOUND MANAGER
+    // 2. SOUND MANAGER & SETTINGS
     // ==========================================
     const SoundManager = {
         isBgmOn: true, isSfxOn: true,
@@ -82,24 +98,32 @@ $(document).ready(function() {
             this.bgm.loop = true;
             this.loadSettings();
             var promise = this.bgm.play();
-            if (promise !== undefined) promise.catch(error => {});
+            // Xử lý lỗi trình duyệt không cho tự động play
+            if (promise !== undefined) promise.catch(error => { console.log("BGM auto-play failed, manual play needed."); }); 
             $('#main-menu').css('background-image', `url('${MAIN_MENU_BG}')`);
         },
+        // >>> CẬP NHẬT LOAD/SAVE SETTINGS ĐỂ XỬ LÝ SKIN
         loadSettings: function() {
             const saved = localStorage.getItem(SETTINGS_KEY);
             if (saved) {
                 const s = JSON.parse(saved);
                 this.isBgmOn = s.isBgmOn;
                 this.isSfxOn = s.isSfxOn;
-                if(s.lang) { currentLang = s.lang; updateLanguage(); }
+                if(s.lang) { currentLang = s.lang; }
+                // Lấy skin đã lưu, nếu không có thì dùng mặc định 'pokemon'
+                if(s.skin) { currentSkin = s.skin; }
             }
             $('#toggle-bgm').prop('checked', this.isBgmOn);
             $('#toggle-sfx').prop('checked', this.isSfxOn);
+            $(`#lang-${currentLang}`).prop('checked', true); // Cập nhật trạng thái ngôn ngữ
+            
             this.updateBgm();
+            updateLanguage(); 
+            applySkin(currentSkin); // Áp dụng skin khi load
         },
         saveSettings: function() {
             localStorage.setItem(SETTINGS_KEY, JSON.stringify({
-                isBgmOn: this.isBgmOn, isSfxOn: this.isSfxOn, lang: currentLang
+                isBgmOn: this.isBgmOn, isSfxOn: this.isSfxOn, lang: currentLang, skin: currentSkin
             }));
         },
         updateBgm: function() {
@@ -110,7 +134,10 @@ $(document).ready(function() {
             if (this.isSfxOn && this.sfx[name]) { this.sfx[name].cloneNode().play().catch(e => {}); }
         }
     };
-    SoundManager.init();
+    
+    // >>> SỬA LỖI 2: CHẠY HÀM KHỞI TẠO VÀO CUỐI HÀM DOCUMENT.READY
+    // LƯU Ý: Vẫn để SoundManager.init() ở đây vì nó liên quan đến background menu
+    SoundManager.init(); 
     
     // ==========================================
     // 3. UI/GAME FLOW FUNCTIONS
@@ -120,6 +147,19 @@ $(document).ready(function() {
         const randomIndex = Math.floor(Math.random() * BACKGROUNDS.length);
         const bgUrl = BACKGROUNDS[randomIndex];
         $('#game-screen').css('background-image', `url('${bgUrl}')`);
+    }
+
+    // >>> THÊM HÀM APPLY SKIN
+    function applySkin(skinKey) {
+        currentSkin = skinKey;
+        // Cập nhật trạng thái UI trong modal
+        $('.skin-option').removeClass('selected-skin');
+        $(`.skin-option[data-skin="${skinKey}"]`).addClass('selected-skin');
+        
+        // Nếu đang trong game, render lại board
+        if (gameMatrix.length > 0) {
+            renderBoard();
+        }
     }
 
     function updateLanguage() {
@@ -142,10 +182,24 @@ $(document).ready(function() {
         setTimeout(() => { notif.css({ opacity: 0, transform: 'translateY(20px)' }); setTimeout(() => { notif.remove(); }, 500); }, 2000);
     }
     
+    // >>> SỬA LỖI: THIẾU HÀM HIỂN THỊ TRẠNG THÁI TẠM DỪNG/TIẾP TỤC TRONG GAME
+    function togglePauseButton(isCurrentlyPaused) {
+        const t = LANG[currentLang];
+        const btn = $('#btn-pause');
+        if (isCurrentlyPaused) {
+            btn.text('▶️ ' + t.resume);
+            btn.off('click').on('click', resumeGame);
+        } else {
+            btn.text('⏸️ ' + (t.pause || 'TẠM DỪNG')); // Thêm thuộc tính pause vào LANG nếu chưa có
+            btn.off('click').on('click', pauseGame);
+        }
+    }
+    // Cập nhật hàm pauseGame và resumeGame để sử dụng togglePauseButton
     function pauseGame() {
         if (!isPaused) { 
             clearInterval(timerInterval);
             isPaused = true;
+            togglePauseButton(true);
         }
     }
 
@@ -153,6 +207,7 @@ $(document).ready(function() {
         if (isPaused && time > 0) { 
             startTimer(); 
             isPaused = false;
+            togglePauseButton(false);
         }
     }
     
@@ -160,11 +215,20 @@ $(document).ready(function() {
     // 4. EVENT HANDLERS
     // ==========================================
 
-    $('#language-select').change(function() {
+    // SỬA LỖI: Thay vì change() cho select, dùng click() cho radio button
+    $('[name="lang"]').change(function() {
         currentLang = $(this).val();
         updateLanguage();
         SoundManager.saveSettings();
     });
+    
+    // >>> THÊM SỰ KIỆN CHỌN SKIN
+    $('.skin-option').click(function() {
+        const skinKey = $(this).data('skin');
+        applySkin(skinKey);
+        SoundManager.saveSettings();
+    });
+
 
     // XỬ LÝ SỰ KIỆN NÚT CÀI ĐẶT (MENU VÀ GAME)
     $('#btn-settings-menu, #btn-settings-game').click(() => {
@@ -174,22 +238,27 @@ $(document).ready(function() {
             pauseGame(); 
             $('#btn-save-exit').show(); 
         }
-        $('#language-select').val(currentLang); 
+        $(`#lang-${currentLang}`).prop('checked', true); 
         $('#settings-modal').removeClass('hidden');
     });
 
     // SỰ KIỆN ĐÓNG MODAL (Nút X)
-    $('#close-modal-btn').click(() => {
+    // >>> SỬA LỖI: SỬ DỤNG HÀM TẠM THỜI ĐỂ ĐÓNG TẤT CẢ MODAL
+    function hideModal() {
+        $('.modal-overlay').addClass('hidden');
+    }
+    // Gắn sự kiện cho nút HỦY (CANCEL) và đóng chung
+    $('[data-action="close-modal"]').click(() => {
         if (!$('#game-screen').hasClass('hidden')) {
              resumeGame();
         }
-        $('#settings-modal').addClass('hidden');
+        hideModal();
     });
 
     // SỰ KIỆN ĐÓNG MODAL (LƯU VÀ THOÁT)
     $('#btn-save-exit').click(() => {
         saveGame(true); 
-        $('#settings-modal').addClass('hidden'); 
+        hideModal(); 
         showScreen('main-menu');
     });
 
@@ -216,24 +285,27 @@ $(document).ready(function() {
             $('#btn-confirm-new-game').data('mode-key', selectedModeKey);
             // Hiện modal xác nhận
             $('#mode-modal').removeClass('hidden');
-        } else if (gameMatrix.length === 0) {
+        } else if (gameMatrix.length === 0 || !isCurrentMode) { // Thêm điều kiện !isCurrentMode nếu muốn chuyển mode khi game chưa bắt đầu
             // Chưa có game (hoặc game vừa kết thúc), bắt đầu ngay
             newGame(newMode);
         }
-        // Nếu game đang chạy và bấm lại mode cũ, không làm gì cả
+        // Thêm trạng thái chọn mode (UI)
+        $('.btn-mode').removeClass('selected-mode');
+        $(this).addClass('selected-mode');
     });
-
+    
     // Xử lý nút BẮT ĐẦU trong modal xác nhận
     $('#btn-confirm-new-game').click(function() {
         const modeKey = $(this).data('mode-key'); // Lấy key mode đã lưu
         const newMode = MODES[modeKey];
-        $('#mode-modal').addClass('hidden');
+        hideModal(); // Dùng hàm chung
         newGame(newMode);
     });
     
     // Xử lý nút HỦY trong modal xác nhận
+    // >>> SỬA LỖI: Đổi id sang data-action="close-modal" (hoặc chỉ cần dùng hàm hideModal() và logic resume)
     $('#btn-cancel-new-game').click(() => { 
-        $('#mode-modal').addClass('hidden'); 
+        hideModal(); 
         // Đảm bảo nút mode được chọn vẫn là mode hiện tại của game sau khi hủy
         if(gameMatrix.length > 0) {
             $('.btn-mode').removeClass('selected-mode');
@@ -256,18 +328,20 @@ $(document).ready(function() {
             modalTitle.text(t.win_title).removeClass('text-danger').addClass('text-success');
             modalScore.html(`${t.total_score} <span class="text-success fw-bolder">${finalScore}</span>`);
             const btnNew = $(`<button class="btn btn-warning fw-bold text-dark">${t.play_new}</button>`);
-            btnNew.click(() => { $('#game-end-modal').addClass('hidden'); showScreen('game-screen'); newGame(MODES.EASY); });
+            // Sửa lỗi: Gọi showScreen('game-screen') khi CHƠI MỚI
+            btnNew.click(() => { hideModal(); showScreen('game-screen'); newGame(currentMode); }); 
             modalButtons.append(btnNew);
         } else if (type === 'LOSE') {
             SoundManager.playSfx('lose');
             modalTitle.text(t.lose_title).removeClass('text-success').addClass('text-danger');
             modalScore.html(`${t.score}: <span class="text-danger fw-bolder">${score}</span>`);
             const btnRestart = $(`<button class="btn btn-primary fw-bold">${t.play_again}</button>`);
-            btnRestart.click(() => { $('#game-end-modal').addClass('hidden'); showScreen('game-screen'); newGame(currentMode); });
+            // Sửa lỗi: Gọi showScreen('game-screen') khi CHƠI LẠI
+            btnRestart.click(() => { hideModal(); showScreen('game-screen'); newGame(currentMode); }); 
             modalButtons.append(btnRestart);
         }
         const btnExit = $(`<button class="btn btn-secondary fw-bold">${t.exit}</button>`);
-        btnExit.click(() => { $('#game-end-modal').addClass('hidden'); showScreen('main-menu'); });
+        btnExit.click(() => { hideModal(); showScreen('main-menu'); });
         modalButtons.append(btnExit);
         $('#game-end-modal').removeClass('hidden');
     }
@@ -278,7 +352,7 @@ $(document).ready(function() {
 
     function saveGame(isSilent = false) {
         if (time <= 0 || !gameMatrix.length || isProcessing) return;
-        const state = { matrix: gameMatrix, score: score, time: time, maxTime: maxTime, modeKey: getModeKey(currentMode) };
+        const state = { matrix: gameMatrix, score: score, time: time, maxTime: maxTime, modeKey: getModeKey(currentMode), skin: currentSkin };
         localStorage.setItem(SAVE_KEY, JSON.stringify(state));
         if (!isSilent) showNotification(LANG[currentLang].notif_saved);
         checkSavedGame();
@@ -287,21 +361,33 @@ $(document).ready(function() {
     function loadGame() {
         const saved = localStorage.getItem(SAVE_KEY); if (!saved) return;
         const state = JSON.parse(saved); const modeKey = state.modeKey || 'EASY';
-        currentMode = { ...MODES[modeKey] }; currentMode.ROWS = state.matrix.length - 2; currentMode.COLS = state.matrix[0].length - 2;
-        gameMatrix = state.matrix; score = state.score; time = state.time; maxTime = state.maxTime || MODES[modeKey].TIME; 
+        currentMode = { ...MODES[modeKey] }; 
+        currentMode.ROWS = state.matrix.length - 2; 
+        currentMode.COLS = state.matrix[0].length - 2;
+        gameMatrix = state.matrix; 
+        score = state.score; 
+        time = state.time; 
+        maxTime = state.maxTime || MODES[modeKey].TIME;
+        
+        // Load Skin
+        currentSkin = state.skin || 'pokemon'; 
+        applySkin(currentSkin);
+        
         showScreen('game-screen'); changeRandomBackground(); startLoadedGame();
     }
 
     function checkSavedGame() { if (localStorage.getItem(SAVE_KEY)) { $('#btn-resume').removeClass('hidden'); } else { $('#btn-resume').addClass('hidden'); } }
-    function getModeKey(modeObj) { for (let k in MODES) { if (MODES[k].CLASS === modeObj.CLASS && MODES[k].SHIFT === modeObj.SHIFT) return k; } return 'EASY'; }
+    function getModeKey(modeObj) { for (let k in MODES) { if (MODES[k].CLASS === modeObj.CLASS) return k; } return 'EASY'; }
     function showScreen(id) { $('.screen').addClass('hidden'); $(`#${id}`).removeClass('hidden'); }
     $('#btn-play').click(() => { showScreen('game-screen'); newGame(MODES.EASY); });
     $('#btn-resume').click(() => loadGame());
-
+    $('#close-modal-btn').on('click', hideSettingsModal);
+    
     function newGame(mode) {
         localStorage.removeItem(SAVE_KEY); currentMode = mode; score = 0; maxTime = mode.TIME; time = mode.TIME; isPaused = false; 
         changeRandomBackground(); resetState();
         $('.btn-mode').removeClass('selected-mode'); $(`.btn-mode[data-mode="${getModeKey(mode)}"]`).addClass('selected-mode');
+        togglePauseButton(false); // Đảm bảo nút hiển thị TẠM DỪNG
         generateMatrix(); renderBoard(); startTimer();
     }
 
@@ -310,21 +396,59 @@ $(document).ready(function() {
         if (time > 0) { startTimer(); } else { isPaused = true; } 
         updateLanguage();
         $('.btn-mode').removeClass('selected-mode'); $(`.btn-mode[data-mode="${getModeKey(currentMode)}"]`).addClass('selected-mode');
+        togglePauseButton(isPaused); // Đảm bảo nút hiển thị đúng trạng thái
         renderBoard();
     }
     
     function resetState() { clearInterval(timerInterval); isProcessing = false; selectedTile = null; $('.connector').remove(); updateUI(); updateLanguage(); }
     function updateUI() {
-        $('#score').text(score);
+        $('#score-value').text(score); // SỬA LỖI: Dùng #score-value thay vì #score
         const percent = (time / maxTime) * 100;
         $('#time-bar').css('width', percent + '%');
         if (percent < 20) { $('#time-bar').css('background', '#c0392b'); } 
         else if (percent < 50) { $('#time-bar').css('background', '#f39c12'); } 
         else { $('#time-bar').css('background', 'linear-gradient(90deg, #e74c3c, #f1c40f, #2ecc71)'); }
+        // Cập nhật trạng thái nút Gợi ý/Xáo trộn (nếu bạn có thêm logic cho nó)
     }
     function startTimer() { if (isPaused) return; clearInterval(timerInterval); timerInterval = setInterval(() => { time--; updateUI(); if (time <= 0) { clearInterval(timerInterval); showEndGameModal('LOSE'); } }, 1000); }
     function generateMatrix() { let attempts = 0; do { const total = currentMode.ROWS * currentMode.COLS; let tiles = []; const types = 20; while (tiles.length < total) { for (let i = 1; i <= types; i++) { if (tiles.length >= total) break; tiles.push(i, i); } } tiles.sort(() => Math.random() - 0.5); gameMatrix = []; for (let r = 0; r < currentMode.ROWS + 2; r++) { gameMatrix[r] = []; for (let c = 0; c < currentMode.COLS + 2; c++) { if (r === 0 || r === currentMode.ROWS + 1 || c === 0 || c === currentMode.COLS + 1) { gameMatrix[r][c] = 0; } else { gameMatrix[r][c] = tiles.pop(); } } } attempts++; if (attempts > 50) break; } while (!checkAnyMoveExists()); }
-    function renderBoard() { const board = $('#game-board'); board.empty(); let dummyTile = $('<div></div>').addClass(currentMode.CLASS).css('visibility', 'hidden').appendTo('body'); const s = dummyTile.outerWidth(true); dummyTile.remove(); const w = currentMode.COLS * s; board.css('width', w + 'px'); for (let r = 1; r <= currentMode.ROWS; r++) { for (let c = 1; c <= currentMode.COLS; c++) { const type = gameMatrix[r][c]; const tile = $('<div></div>').addClass('tile ' + currentMode.CLASS).attr('data-r', r).attr('data-c', c); if (type !== 0) { tile.css('background-image', `url('images/${type}.${IMAGE_EXTENSION}')`); tile.attr('data-type', type); tile.on('click', onTileClick); } else { tile.css('opacity', 0).css('cursor', 'default'); } board.append(tile); } } }
+    
+    // >>> SỬA LỖI 3: CẬP NHẬT RENDER BOARD ĐỂ DÙNG SKIN
+    function renderBoard() { 
+        const board = $('#game-board'); board.empty(); 
+        
+        // Thêm class cho board để điều chỉnh layout
+        board.removeClass().addClass(currentMode.CLASS.replace('tile-', 'board-'));
+
+        let dummyTile = $('<div></div>').addClass(currentMode.CLASS).css('visibility', 'hidden').appendTo('body'); 
+        const s = dummyTile.outerWidth(true); 
+        dummyTile.remove(); 
+        
+        const w = currentMode.COLS * s; 
+        board.css({
+            'width': w + 'px',
+            'grid-template-columns': `repeat(${currentMode.COLS}, ${s}px)` // Thiết lập grid
+        });
+
+        const skinFolder = SKINS[currentSkin].folder; // Lấy thư mục skin
+        
+        for (let r = 1; r <= currentMode.ROWS; r++) { 
+            for (let c = 1; c <= currentMode.COLS; c++) { 
+                const type = gameMatrix[r][c]; 
+                const tile = $('<div></div>').addClass('tile ' + currentMode.CLASS).attr('data-r', r).attr('data-c', c); 
+                if (type !== 0) { 
+                    // Cập nhật đường dẫn ảnh sử dụng skin hiện tại
+                    tile.css('background-image', `url('images/${skinFolder}${type}.${IMAGE_EXTENSION}')`); 
+                    tile.attr('data-type', type); 
+                    tile.on('click', onTileClick); 
+                } else { 
+                    tile.css('opacity', 0).css('cursor', 'default'); 
+                } 
+                board.append(tile); 
+            } 
+        } 
+    }
+    
     function onTileClick() { if (isProcessing || time <= 0 || isPaused) return; const clicked = $(this); if (clicked.css('opacity') == 0 || clicked.hasClass('selected')) return; $('.tile').removeClass('hint-anim'); if (!selectedTile) { selectedTile = clicked; selectedTile.addClass('selected'); return; } const r1 = parseInt(selectedTile.attr('data-r')); const c1 = parseInt(selectedTile.attr('data-c')); const type1 = parseInt(selectedTile.attr('data-type')); const r2 = parseInt(clicked.attr('data-r')); const c2 = parseInt(clicked.attr('data-c')); const type2 = parseInt(clicked.attr('data-type')); if (type1 === type2 && checkPath(r1, c1, r2, c2)) { isProcessing = true; clicked.addClass('selected'); SoundManager.playSfx('match'); drawPathLine(r1, c1, r2, c2); gameMatrix[r1][c1] = 0; gameMatrix[r2][c2] = 0; score += MATCH_SCORE; updateUI(); setTimeout(() => { selectedTile.css('opacity', 0).removeClass('selected').off('click'); clicked.css('opacity', 0).removeClass('selected').off('click'); $('.connector').remove(); selectedTile = null; isProcessing = false; if (currentMode.SHIFT) shiftTiles(); else checkEndGameOrShuffle(); }, 300); } else { selectedTile.removeClass('selected'); selectedTile = clicked; selectedTile.addClass('selected'); } }
     
     // CORE LOGIC (Giữ nguyên)
@@ -334,7 +458,7 @@ $(document).ready(function() {
     function checkLineWithOneCorner(r1, c1, r2, c2) { if (gameMatrix[r1][c2] === 0 || (r1===r2 && c1===c2)) { if (checkLine(r1, c1, r1, c2) && checkLine(r1, c2, r2, c2)) return { path: [{r:r1, c:c1}, {r:r1, c:c2}, {r:r2, c:c2}] }; } if (gameMatrix[r2][c1] === 0 || (r1===r2 && c1===c2)) { if (checkLine(r1, c1, r2, c1) && checkLine(r2, c1, r2, c2)) return { path: [{r:r1, c:c1}, {r:r2, c:c1}, {r:r2, c:c2}] }; } return { path: [] }; }
     function checkLineWithTwoCorners(r1, c1, r2, c2) { for (let c = 0; c <= currentMode.COLS + 1; c++) { if (gameMatrix[r1][c] === 0 && gameMatrix[r2][c] === 0) { if (checkLine(r1, c1, r1, c) && checkLine(r2, c2, r2, c) && checkLine(r1, c, r2, c)) return { path: [{r:r1, c:c1}, {r:r1, c:c}, {r:r2, c:c}, {r:r2, c:c2}] }; } } for (let r = 0; r <= currentMode.ROWS + 1; r++) { if (gameMatrix[r][c1] === 0 && gameMatrix[r][c2] === 0) { if (checkLine(r1, c1, r, c1) && checkLine(r2, c2, r, c2) && checkLine(r, c1, r, c2)) return { path: [{r:r1, c:c1}, {r:r, c:c1}, {r:r, c:c2}, {r:r2, c:c2}] }; } } return { path: [] }; }
     function drawPathLine(r1, c1, r2, c2) { const board = $('#game-board'); const sampleTile = $('.tile').first(); const s = sampleTile.outerWidth(true); for (let i = 0; i < foundPathCoords.length - 1; i++) { const pa = foundPathCoords[i]; const pb = foundPathCoords[i+1]; const x1 = (pa.c - 1) * s + s/2, y1 = (pa.r - 1) * s + s/2; const x2 = (pb.c - 1) * s + s/2, y2 = (pb.r - 1) * s + s/2; const len = Math.sqrt((x2-x1)**2 + (y2-y1)**2); const angle = Math.atan2(y2-y1, x2-x1) * 180 / Math.PI; const line = $('<div class="connector"></div>').css({ width: len + 'px', height: '4px', left: x1 + 'px', top: (y1 - 2) + 'px', transform: `rotate(${angle}deg)`, transformOrigin: '0 50%' }); board.append(line); } }
-    function useHint() { if (isProcessing || isPaused) return; if (score < HINT_COST) { SoundManager.playSfx('error'); showNotification(LANG[currentLang].notif_hint_cost); return; } const tiles = []; for (let r=1; r<=currentMode.ROWS; r++) for (let c=1; c<=currentMode.COLS; c++) if (gameMatrix[r][c] !== 0) tiles.push({r,c,t:gameMatrix[r][c]}); let move = null; for (let i=0; i<tiles.length; i++) for (let j=i+1; j<tiles.length; j++) if (tiles[i].t === tiles[j].t && checkPath(tiles[i].r, tiles[i].c, tiles[j].r, tiles[j].c)) { move = [tiles[i], tiles[j]]; break; } if (move) { score -= HINT_COST; updateUI(); $(`.tile[data-r="${move[0].r}"][data-c="${move[0].c}"], .tile[data-r="${move[1].r}"][data-c="${move[1].c}"]`).addClass('hint-anim'); setTimeout(() => $('.tile').removeClass('hint-anim'), 2000); showNotification(LANG[currentLang].notif_hint_used); } else { showNotification(LANG[currentLang].notif_no_move); performShuffle(true); } }
+    function useHint() { if (isProcessing || isPaused) return; if (score < HINT_COST) { SoundManager.playSfx('error'); showNotification(LANG[currentLang].notif_hint_cost); return; } const tiles = []; for (let r=1; r<=currentMode.ROWS; r++) for (let c=1; c<=currentMode.COLS; c++) if (gameMatrix[r][c] !== 0) tiles.push({r,c,t:gameMatrix[r][c]}); let move = null; for (let i=0; i<tiles.length; i++) for (let j=i+1; j<tiles.length; j++) if (tiles[i].t === tiles[j].t && checkPathForMove(tiles[i].r, tiles[i].c, tiles[j].r, tiles[j].c)) { move = [tiles[i], tiles[j]]; break; } if (move) { score -= HINT_COST; updateUI(); $(`.tile[data-r="${move[0].r}"][data-c="${move[0].c}"], .tile[data-r="${move[1].r}"][data-c="${move[1].c}"]`).addClass('hint-anim'); setTimeout(() => $('.tile').removeClass('hint-anim'), 2000); showNotification(LANG[currentLang].notif_hint_used); } else { showNotification(LANG[currentLang].notif_no_move); performShuffle(true); } }
     function useShuffle() { if (isProcessing || isPaused) return; if (score < SHUFFLE_COST) { SoundManager.playSfx('error'); showNotification(LANG[currentLang].notif_shuffle_cost); return; } score -= SHUFFLE_COST; updateUI(); isProcessing = true; do { performShuffle(false); } while (!checkAnyMoveExists()); renderBoard(); showNotification(LANG[currentLang].notif_shuffle_used); isProcessing = false; checkEndGameOrShuffle(); }
     function shiftTiles() { for (let c = 1; c <= currentMode.COLS; c++) { let colVals = []; for (let r = 1; r <= currentMode.ROWS; r++) if (gameMatrix[r][c] !== 0) colVals.push(gameMatrix[r][c]); const newCol = Array(currentMode.ROWS - colVals.length).fill(0).concat(colVals); for (let r = 1; r <= currentMode.ROWS; r++) gameMatrix[r][c] = newCol[r-1]; } renderBoard(); checkEndGameOrShuffle(); }
     function checkEndGameOrShuffle() { let hasTile = false; for (let r=1; r<=currentMode.ROWS; r++) for (let c=1; c<=currentMode.COLS; c++) if (gameMatrix[r][c] !== 0) hasTile = true; if (!hasTile) { showEndGameModal('WIN'); return; } if (!checkAnyMoveExists()) { isProcessing = true; showNotification(LANG[currentLang].notif_no_move); do { performShuffle(false); } while (!checkAnyMoveExists()); renderBoard(); isProcessing = false; } }
@@ -342,6 +466,31 @@ $(document).ready(function() {
     function checkAnyMoveExists() { const tiles = []; for (let r=1; r<=currentMode.ROWS; r++) for (let c=1; c<=currentMode.COLS; c++) if (gameMatrix[r][c] !== 0) tiles.push({r,c,t:gameMatrix[r][c]}); for (let i=0; i<tiles.length; i++) { for (let j=i+1; j<tiles.length; j++) { if (tiles[i].t === tiles[j].t && checkPathForMove(tiles[i].r, tiles[i].c, tiles[j].r, tiles[j].c)) return true; } } return false; }
     function checkPathForMove(r1, c1, r2, c2) { if (r1 === r2 && c1 === c2) return false; if (checkLine(r1, c1, r2, c2)) return true; if (checkLineWithOneCorner(r1, c1, r2, c2).path.length > 0) return true; if (checkLineWithTwoCorners(r1, c1, r2, c2).path.length > 0) return true; return false; }
 
-    updateLanguage(); 
+    // >>> SỬA LỖI: CHẠY HÀM KIỂM TRA LƯU TRỮ VÀ CẬP NHẬT GIAO DIỆN SAU KHI TẤT CẢ CÁC HÀM ĐÃ ĐƯỢC ĐỊNH NGHĨA
     checkSavedGame();
+    // updateLanguage() đã được gọi trong SoundManager.loadSettings()
+    // HÀM ĐÓNG MODAL CÀI ĐẶT
+    function hideSettingsModal() {
+        // 1. Dùng hàm chung để ẩn Modal Overlay (Tất cả modal có class .modal-overlay)
+        $('.modal-overlay').addClass('hidden'); 
+        
+        // >>> SỬA LỖI: ĐẢM BẢO GAME TIẾP TỤC (RESUME) KHI ĐÓNG MODAL CÀI ĐẶT
+        // Nếu màn hình game đang hiển thị (chứng tỏ đang chơi), thì tiếp tục game
+        if (!$('#game-screen').hasClass('hidden')) {
+            resumeGame(); // <--- DÒNG CODE QUAN TRỌNG ĐÃ ĐƯỢC THÊM/SỬA
+        }
+        
+        // 2. Logic tiếp tục game (chỉ cần chạy nếu đang ở màn hình game và game đang tạm dừng)
+        if (typeof isGameActive !== 'undefined' && isGameActive() && typeof timeRemaining !== 'undefined' && timeRemaining > 0) {
+            isPaused = false;
+            if (typeof startTimer === 'function') {
+                startTimer();
+            }
+        }
+        
+        // 3. Khôi phục nhạc nền (Nếu có hàm toggleBGM)
+        if (typeof toggleBGM === 'function' && typeof settings !== 'undefined') {
+            toggleBGM(settings.bgm);
+        }
+    }
 });

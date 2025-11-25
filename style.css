@@ -9,13 +9,11 @@ body {
     transition: background-image 0.5s ease-in-out;
 }
 
-/* QUAN TRỌNG: Class để ẩn Modal */
 .hidden { display: none !important; }
 
 /* --- MÀN HÌNH MENU --- */
 #main-menu {
-    /* Đảm bảo Background load được với đường dẫn chữ thường */
-    background: url('images/main_bg.jpg') no-repeat center center;
+    background-color: #2c3e50; 
     background-size: cover; 
     background-attachment: fixed;
     width: 100%;
@@ -44,52 +42,63 @@ body {
 }
 
 .btn-custom {
-    background: linear-gradient(to bottom, #ffeb3b, #f39c12);
-    border: 4px solid #fff;
-    border-radius: 50px;
-    color: #d35400;
-    font-size: 24px;
-    font-weight: 900;
-    padding: 10px 0;
-    text-transform: uppercase;
-    box-shadow: 0 5px 15px rgba(0,0,0,0.4);
+    padding: 15px 30px;
+    font-size: 1.2rem;
+    font-weight: bold;
+    border-radius: 10px;
+    border: none;
     cursor: pointer;
-    transition: transform 0.1s;
-    text-shadow: 1px 1px 0px rgba(255,255,255,0.6);
-}
-
-.btn-custom:hover {
-    transform: scale(1.05);
-    background: linear-gradient(to bottom, #fff200, #ffc107);
+    transition: all 0.3s ease;
+    text-transform: uppercase;
 }
 
 .btn-continue {
-    background: linear-gradient(to bottom, #2ecc71, #27ae60);
+    background: linear-gradient(to right, #3498db, #2980b9);
     color: white;
-    text-shadow: 1px 1px 2px rgba(0,0,0,0.5);
+    box-shadow: 0 4px #2980b9;
+}
+
+.btn-new {
+    background: linear-gradient(to right, #e74c3c, #c0392b);
+    color: white;
+    box-shadow: 0 4px #c0392b;
+}
+
+.btn-custom:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px rgba(0,0,0,0.2);
+}
+
+.btn-custom:active {
+    transform: translateY(2px);
+    box-shadow: 0 2px rgba(0,0,0,0.2);
 }
 
 .settings-btn-container {
     position: absolute;
-    right: 30px;
-    top: 50%; 
-    transform: translateY(-50%);
+    bottom: 20px;
+    right: 20px;
 }
 
 .btn-icon-settings {
-    width: 60px;
-    height: 60px;
+    width: 50px;
+    height: 50px;
     border-radius: 50%;
     background: linear-gradient(to bottom, #bdc3c7, #95a5a6);
     border: 3px solid white;
-    font-size: 30px;
+    font-size: 24px;
     cursor: pointer;
-    box-shadow: 0 4px 10px rgba(0,0,0,0.5);
+    box-shadow: 0 4px 8px rgba(0,0,0,0.3);
+    transition: transform 0.2s;
     display: flex;
     align-items: center;
     justify-content: center;
 }
-.btn-icon-settings:hover { transform: rotate(90deg) translateY(-50%); transition: 0.3s; }
+
+.btn-icon-settings:hover {
+    transform: scale(1.1) rotate(90deg);
+}
+
 
 /* --- MÀN HÌNH GAME --- */
 #game-screen {
@@ -102,7 +111,6 @@ body {
     align-items: center;
     padding-top: 10px;
     position: relative;
-    overflow: hidden; /* Ngăn tràn ngang/dọc không mong muốn */
 }
 
 .game-header {
@@ -120,33 +128,40 @@ body {
     position: relative; 
 }
 
-.header-top-row {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    width: 100%;
-}
-
+/* NÚT CÀI ĐẶT GAME (Góc Trái) */
 .btn-icon-settings-game {
-    width: 40px; 
-    height: 40px;
+    position: absolute;
+    top: 15px; 
+    left: 15px; 
+    z-index: 100;
+    
+    width: 45px;
+    height: 45px;
     border-radius: 50%;
     background: linear-gradient(to bottom, #bdc3c7, #95a5a6);
-    border: 3px solid white;
-    font-size: 20px; 
+    border: 2px solid white;
+    font-size: 24px;
     cursor: pointer;
-    box-shadow: 0 4px 10px rgba(0,0,0,0.5);
+    box-shadow: 0 2px 5px rgba(0,0,0,0.5);
     display: flex;
     align-items: center;
     justify-content: center;
     transition: transform 0.2s;
-    margin-right: 10px; 
 }
+
 .btn-icon-settings-game:hover { 
     transform: scale(1.1) rotate(90deg); 
 }
 
-/* KÍCH THƯỚC ĐIỂM VÀ THỜI GIAN */
+.header-top-row {
+    display: flex;
+    justify-content: flex-end; /* Đẩy stats box sang phải */
+    align-items: center;
+    width: 100%;
+    /* Padding trái để tránh nút setting đè lên text */
+    padding-left: 60px; 
+}
+
 .stats-box {
     display: flex;
     justify-content: flex-end; 
@@ -189,15 +204,15 @@ body {
 }
 
 .btn-mode {
+    padding: 5px 10px;
+    font-size: 0.9rem;
     background-color: #34495e;
     color: #ecf0f1;
     border: 2px solid #2c3e50;
     border-radius: 20px;
-    padding: 5px 15px;
     font-weight: bold;
     text-transform: uppercase;
     transition: all 0.2s;
-    font-size: 0.8rem;
 }
 
 .btn-mode:hover {
@@ -216,15 +231,12 @@ body {
 #game-board {
     position: relative;
     background-color: rgba(52, 73, 94, 0.7); 
-    display: flex;
-    flex-wrap: wrap;
-    box-sizing: content-box;
+    display: grid; 
+    box-sizing: content-box; 
     border: 4px solid #7f8c8d;
     box-shadow: 0 0 20px rgba(0,0,0,0.5);
     margin-top: 10px;
     flex-grow: 1;
-    overflow: hidden; 
-    /* Sửa đổi: Căn các hàng vào giữa nếu còn khoảng trống (giúp giảm khoảng trống thừa) */
     align-content: center; 
 }
 
@@ -274,12 +286,44 @@ body {
 }
 
 .modal-box {
-    background: #fff;
-    padding: 25px;
+    background: #2c3e50; /* Nền tối cho modal cài đặt */
+    padding: 30px;
     border-radius: 15px;
-    width: 350px;
-    border: 5px solid #ffc107;
-    box-shadow: 0 0 30px rgba(255, 193, 7, 0.5);
+    width: 400px;
+    max-width: 90%;
+    border: 2px solid #fff;
+    box-shadow: 0 0 30px rgba(0,0,0,0.5);
+    color: white;
+}
+
+/* Skin option styling */
+.skin-option {
+    border: 2px solid transparent;
+    transition: all 0.2s;
+    color: white;
+}
+.skin-option:hover {
+    transform: translateY(-2px);
+    border-color: #bdc3c7;
+}
+.selected-skin {
+    border-color: #f1c40f !important;
+    background-color: rgba(241, 196, 15, 0.2);
+    box-shadow: 0 0 10px #f1c40f;
+}
+
+/* Nút đóng X cho modal */
+.close-modal-x {
+    position: absolute;
+    top: 10px;
+    right: 15px;
+    font-size: 30px;
+    cursor: pointer;
+    color: #bdc3c7;
+    line-height: 1;
+}
+.close-modal-x:hover {
+    color: white;
 }
 
 /* ======================================================= */
@@ -294,23 +338,18 @@ body {
         max-width: none; 
     }
     
-    .header-top-row {
-        flex-direction: row; 
-        justify-content: space-between;
-        gap: 0; 
-    }
-    
     .btn-icon-settings-game {
-        width: 35px;
-        height: 35px;
-        font-size: 18px;
-        margin-right: 5px; 
+        width: 40px;
+        height: 40px;
+        font-size: 20px;
+        top: 10px;
+        left: 10px;
     }
 
     /* Kích thước Điểm/Thời gian cho di động */
     .stats-box {
         font-size: 1.2rem; 
-        width: auto;
+        width: 100%;
         justify-content: flex-end;
     }
 
@@ -329,14 +368,14 @@ body {
         padding: 4px 8px;
     }
     
-    /* Sửa đổi: Tăng VW để scale tốt hơn trong màn hình dọc và lấp đầy khoảng trống */
+    /* FIX: Sử dụng VW để scale tốt hơn trong màn hình dọc và lấp đầy khoảng trống */
     .tile-easy, .tile-medium { 
-        width: 9vw; /* Tăng từ 8.5vw/8vw lên 9vw */
+        width: 9vw; 
         height: 9vw; 
         margin: 0.5px; 
     }
     .tile-hard { 
-        width: 6vw; /* Tăng từ 5.8vw/5.5vw lên 6vw */
+        width: 6vw; 
         height: 6vw; 
         margin: 0.5px; 
     }
@@ -352,18 +391,25 @@ body {
 /* --- CẤU HÌNH MÀN HÌNH DI ĐỘNG (NGANG - LANDSCAPE) --- */
 @media screen and (orientation: landscape) and (max-width: 992px) {
     #game-screen {
-        /* Giảm padding để tối đa hóa không gian bàn chơi */
         padding-top: 5px;
         padding-bottom: 5px;
         min-height: 100vh;
         height: auto;
-        overflow-y: auto; /* Cho phép cuộn dọc nếu bàn cờ cao hơn màn hình */
+        overflow-y: auto; 
     }
 
     .game-header {
         padding: 5px 10px;
         max-width: 98%;
         margin-bottom: 5px;
+    }
+
+    .btn-icon-settings-game {
+        top: 5px;
+        left: 5px;
+        width: 35px;
+        height: 35px;
+        font-size: 18px;
     }
 
     /* FIX: Sử dụng VH để scale dựa trên CHIỀU CAO, ngăn tràn ngang */
@@ -379,12 +425,10 @@ body {
     }
     
     #game-board {
-        /* Đảm bảo bàn chơi không chiếm quá nhiều chiều cao */
         max-height: 75vh; 
         overflow-y: auto; 
     }
     
-    /* Điều chỉnh UI Header cho màn hình ngang nhỏ gọn */
     .stats-box {
         font-size: 1rem; 
         gap: 8px;
