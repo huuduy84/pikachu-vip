@@ -4,7 +4,7 @@ body {
     font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
     margin: 0;
     padding: 0;
-    overflow: hidden; 
+   
     height: 100vh;
     width: 100vw;
 }
@@ -191,29 +191,61 @@ body {
     box-shadow: 0 0 30px rgba(255, 193, 7, 0.5);
 }
 
+/*/* ======================================================= */
+/* === ĐIỀU CHỈNH RESPONSIVE CUỐI CÙNG VÀ AN TOÀN NHẤT === */
 /* ======================================================= */
-/* === ĐIỀU CHỈNH RESPONSIVE CHO MÀN HÌNH DI ĐỘNG (DỌC) === */
-/* ======================================================= */
-@media (max-width: 576px) {
-    /* Giảm kích thước ô gạch cho chế độ Dễ/Thường/Khó */
-    .tile-easy, .tile-medium { 
-        width: 35px; 
-        height: 35px; 
-    }
-    .tile-hard { 
-        width: 25px; 
-        height: 25px; 
-    }
-
-    /* Điều chỉnh font size và padding */
+@media (max-width: 768px) {
+    /* Cấu hình chung cho Menu/Thanh Trạng thái */
     .game-header {
-        padding: 8px 15px;
+        padding: 5px 10px;
         width: 95%; 
+        max-width: none; 
     }
     .stats-box {
-        font-size: 0.9rem;
-        gap: 15px;
+        font-size: 0.7rem; 
+        gap: 8px;
     }
+    .support-bar button, .mode-select-bar button {
+        font-size: 0.65rem; 
+        padding: 4px 6px;
+    }
+
+    /* Kích thước ô gạch cho chế độ DỌC (Dùng vw - viewport width) */
+    .tile-easy, .tile-medium { 
+        width: 6vw; 
+        height: 6vw; 
+        margin: 0.5px;
+    }
+    .tile-hard { 
+        width: 4.5vw; 
+        height: 4.5vw; 
+        margin: 0.5px;
+    }
+    
+    /* --- Điều chỉnh ĐẶC BIỆT cho MÀN HÌNH NGANG (Landscape) --- */
+    @media screen and (orientation: landscape) {
+        .stats-box {
+            font-size: 0.55rem;
+            gap: 5px;
+        }
+        .support-bar button, .mode-select-bar button {
+            font-size: 0.5rem;
+            padding: 2px 4px;
+        }
+
+        /* Giảm kích thước ô gạch dựa trên CHIỀU CAO (vh) */
+        .tile-easy, .tile-medium { 
+            width: 4.2vh; 
+            height: 4.2vh; 
+            margin: 0.5px;
+        }
+        .tile-hard { 
+            width: 3vh; 
+            height: 3vh; 
+            margin: 0.5px;
+        }
+    }
+}
     
     /* Điều chỉnh thanh hỗ trợ */
     .support-bar button {
