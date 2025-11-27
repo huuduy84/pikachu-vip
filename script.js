@@ -63,9 +63,9 @@ $(document).ready(function() {
     let isPaused = false; 
 
     const MODES = {
-        EASY: { TIME: 600, ROWS: 8, COLS: 10, SHIFT: false, CLASS: 'tile-easy'},
-        MEDIUM: { TIME: 480, ROWS: 8, COLS: 10, SHIFT: true, CLASS: 'tile-medium'},
-        HARD: { TIME: 420, ROWS: 12, COLS: 15, SHIFT: true, CLASS: 'tile-hard'}
+        EASY: { TIME: 300, ROWS: 8, COLS: 10, SHIFT: false, CLASS: 'tile-easy'},
+        MEDIUM: { TIME: 300, ROWS: 8, COLS: 10, SHIFT: true, CLASS: 'tile-medium'},
+        HARD: { TIME: 360, ROWS: 13, COLS: 16, SHIFT: true, CLASS: 'tile-hard'}
     };
     
     const MATCH_SCORE = 10; 
@@ -198,16 +198,19 @@ $(document).ready(function() {
     function pauseGame() {
         if (!isPaused) { 
             clearInterval(timerInterval);
+            timerInterval = null;
             isPaused = true;
             togglePauseButton(true);
         }
     }
 
     function resumeGame() {
-        if (isPaused && time > 0) { 
-            startTimer(); 
+        // Đặt trạng thái trước khi gọi startTimer để startTimer không bị chặn
+        if (time <= 0) return; // Nếu đã hết thời gian thì không resume
+        if (isPaused) {
             isPaused = false;
             togglePauseButton(false);
+            startTimer();
         }
     }
     
@@ -318,7 +321,7 @@ $(document).ready(function() {
     // =========================================================
 
     function showEndGameModal(type) {
-        clearInterval(timerInterval); localStorage.removeItem(SAVE_KEY); isPaused = true;
+        clearInterval(timerInterval); timerInterval = null; localStorage.removeItem(SAVE_KEY); isPaused = true;
         const t = LANG[currentLang]; let finalScore = score + Math.floor(time * 0.5); 
         const modalTitle = $('#end-modal-title'); const modalScore = $('#end-modal-score'); const modalButtons = $('#end-modal-buttons');
         modalButtons.empty(); 
@@ -393,25 +396,91 @@ $(document).ready(function() {
 
     function startLoadedGame() {
         resetState(); 
-        if (time > 0) { startTimer(); } else { isPaused = true; } 
+        // Khi load game từ lưu (bấm TIẾP TỤC), ta muốn resume nếu time>0
+        if (time > 0) { 
+            isPaused = false;
+            startTimer(); 
+        } else { 
+            isPaused = true; 
+        } 
         updateLanguage();
         $('.btn-mode').removeClass('selected-mode'); $(`.btn-mode[data-mode="${getModeKey(currentMode)}"]`).addClass('selected-mode');
         togglePauseButton(isPaused); // Đảm bảo nút hiển thị đúng trạng thái
         renderBoard();
     }
     
-    function resetState() { clearInterval(timerInterval); isProcessing = false; selectedTile = null; $('.connector').remove(); updateUI(); updateLanguage(); }
+    function resetState() { 
+        clearInterval(timerInterval); 
+        timerInterval = null;
+        isProcessing = false; 
+        selectedTile = null; 
+        $('.connector').remove(); 
+        updateUI(); 
+        updateLanguage(); 
+    }
     function updateUI() {
-        $('#score-value').text(score); // SỬA LỖI: Dùng #score-value thay vì #score
+        $('#score-value').text(score);
         const percent = (time / maxTime) * 100;
-        $('#time-bar').css('width', percent + '%');
-        if (percent < 20) { $('#time-bar').css('background', '#c0392b'); } 
-        else if (percent < 50) { $('#time-bar').css('background', '#f39c12'); } 
-        else { $('#time-bar').css('background', 'linear-gradient(90deg, #e74c3c, #f1c40f, #2ecc71)'); }
+
+        // SỬA: cập nhật đúng phần tử thanh time
+        $('#time-bar-fill').css('width', percent + '%');
+
+        if (percent < 20) {
+            $('#time-bar-fill').css('background', '#c0392b');
+        } else if (percent < 50) {
+            $('#time-bar-fill').css('background', '#f39c12');
+        } else {
+            $('#time-bar-fill').css('background', 'linear-gradient(90deg, #e74c3c, #f1c40f, #2ecc71)');
+        }
         // Cập nhật trạng thái nút Gợi ý/Xáo trộn (nếu bạn có thêm logic cho nó)
     }
-    function startTimer() { if (isPaused) return; clearInterval(timerInterval); timerInterval = setInterval(() => { time--; updateUI(); if (time <= 0) { clearInterval(timerInterval); showEndGameModal('LOSE'); } }, 1000); }
-    function generateMatrix() { let attempts = 0; do { const total = currentMode.ROWS * currentMode.COLS; let tiles = []; const types = 20; while (tiles.length < total) { for (let i = 1; i <= types; i++) { if (tiles.length >= total) break; tiles.push(i, i); } } tiles.sort(() => Math.random() - 0.5); gameMatrix = []; for (let r = 0; r < currentMode.ROWS + 2; r++) { gameMatrix[r] = []; for (let c = 0; c < currentMode.COLS + 2; c++) { if (r === 0 || r === currentMode.ROWS + 1 || c === 0 || c === currentMode.COLS + 1) { gameMatrix[r][c] = 0; } else { gameMatrix[r][c] = tiles.pop(); } } } attempts++; if (attempts > 50) break; } while (!checkAnyMoveExists()); }
+
+    // SỬA: startTimer không nên trả về nếu isPaused = true (resume sẽ set isPaused=false trước)
+    function startTimer() { 
+        clearInterval(timerInterval); 
+        timerInterval = null;
+        if (time <= 0) return;
+        updateUI(); // cập nhật ngay UI trước khi bắt đầu đếm
+        timerInterval = setInterval(() => { 
+            if (isPaused) return; // nếu trong lúc interval isPaused thì skip decrement
+            time--; 
+            updateUI(); 
+            if (time <= 0) { 
+                clearInterval(timerInterval); 
+                timerInterval = null;
+                showEndGameModal('LOSE'); 
+            } 
+        }, 1000); 
+    }
+
+    function generateMatrix() { 
+        let attempts = 0; 
+        do { 
+            const total = currentMode.ROWS * currentMode.COLS; 
+            let tiles = []; 
+            const types = 20; 
+            while (tiles.length < total) { 
+                for (let i = 1; i <= types; i++) { 
+                    if (tiles.length >= total) break; 
+                    tiles.push(i, i); 
+                } 
+            } 
+            tiles.sort(() => Math.random() - 0.5); 
+            gameMatrix = []; 
+            for (let r = 0; r < currentMode.ROWS + 2; r++) { 
+                gameMatrix[r] = []; 
+                for (let c = 0; c < currentMode.COLS + 2; c++) { 
+                    if (r === 0 || r === currentMode.ROWS + 1 || c === 0 || c === currentMode.COLS + 1) { 
+                        gameMatrix[r][c] = 0; 
+                    } else { 
+                        gameMatrix[r][c] = tiles.pop(); 
+                    } 
+                } 
+            } 
+            attempts++; 
+            if (attempts > 50) break; 
+        } while (!checkAnyMoveExists()); 
+    }
     
     // >>> SỬA LỖI 3: CẬP NHẬT RENDER BOARD ĐỂ DÙNG SKIN
     function renderBoard() { 
@@ -449,22 +518,153 @@ $(document).ready(function() {
         } 
     }
     
-    function onTileClick() { if (isProcessing || time <= 0 || isPaused) return; const clicked = $(this); if (clicked.css('opacity') == 0 || clicked.hasClass('selected')) return; $('.tile').removeClass('hint-anim'); if (!selectedTile) { selectedTile = clicked; selectedTile.addClass('selected'); return; } const r1 = parseInt(selectedTile.attr('data-r')); const c1 = parseInt(selectedTile.attr('data-c')); const type1 = parseInt(selectedTile.attr('data-type')); const r2 = parseInt(clicked.attr('data-r')); const c2 = parseInt(clicked.attr('data-c')); const type2 = parseInt(clicked.attr('data-type')); if (type1 === type2 && checkPath(r1, c1, r2, c2)) { isProcessing = true; clicked.addClass('selected'); SoundManager.playSfx('match'); drawPathLine(r1, c1, r2, c2); gameMatrix[r1][c1] = 0; gameMatrix[r2][c2] = 0; score += MATCH_SCORE; updateUI(); setTimeout(() => { selectedTile.css('opacity', 0).removeClass('selected').off('click'); clicked.css('opacity', 0).removeClass('selected').off('click'); $('.connector').remove(); selectedTile = null; isProcessing = false; if (currentMode.SHIFT) shiftTiles(); else checkEndGameOrShuffle(); }, 300); } else { selectedTile.removeClass('selected'); selectedTile = clicked; selectedTile.addClass('selected'); } }
+    function onTileClick() { 
+        if (isProcessing || time <= 0 || isPaused) return; 
+        const clicked = $(this); 
+        if (clicked.css('opacity') == 0 || clicked.hasClass('selected')) return; 
+        $('.tile').removeClass('hint-anim'); 
+        if (!selectedTile) { 
+            selectedTile = clicked; 
+            selectedTile.addClass('selected'); 
+            return; 
+        } 
+        const r1 = parseInt(selectedTile.attr('data-r')); const c1 = parseInt(selectedTile.attr('data-c')); const type1 = parseInt(selectedTile.attr('data-type')); 
+        const r2 = parseInt(clicked.attr('data-r')); const c2 = parseInt(clicked.attr('data-c')); const type2 = parseInt(clicked.attr('data-type')); 
+        if (type1 === type2 && checkPath(r1, c1, r2, c2)) { 
+            isProcessing = true; 
+            clicked.addClass('selected'); 
+            SoundManager.playSfx('match'); 
+            drawPathLine(r1, c1, r2, c2); 
+            gameMatrix[r1][c1] = 0; 
+            gameMatrix[r2][c2] = 0; 
+            score += MATCH_SCORE; 
+            updateUI(); 
+            setTimeout(() => { 
+                selectedTile.css('opacity', 0).removeClass('selected').off('click'); 
+                clicked.css('opacity', 0).removeClass('selected').off('click'); 
+                $('.connector').remove(); 
+                selectedTile = null; 
+                isProcessing = false; 
+                if (currentMode.SHIFT) shiftTiles(); else checkEndGameOrShuffle(); 
+            }, 300); 
+        } else { 
+            selectedTile.removeClass('selected'); 
+            selectedTile = clicked; 
+            selectedTile.addClass('selected'); 
+        } 
+    }
     
     // CORE LOGIC (Giữ nguyên)
     let foundPathCoords = []; 
-    function checkPath(r1, c1, r2, c2) { if (r1 === r2 && c1 === c2) return false; foundPathCoords = []; if (checkLine(r1, c1, r2, c2)) { foundPathCoords = [{r:r1, c:c1}, {r:r2, c:c2}]; return true; } let pathOne = checkLineWithOneCorner(r1, c1, r2, c2); if(pathOne.path.length > 0) { foundPathCoords = pathOne.path; return true; } let pathTwo = checkLineWithTwoCorners(r1, c1, r2, c2); if(pathTwo.path.length > 0) { foundPathCoords = pathTwo.path; return true; } return false; }
-    function checkLine(r1, c1, r2, c2) { if (r1 === r2) { const min = Math.min(c1, c2), max = Math.max(c1, c2); for (let c = min + 1; c < max; c++) if (gameMatrix[r1][c] !== 0) return false; return true; } if (c1 === c2) { const min = Math.min(r1, r2), max = Math.max(r1, r2); for (let r = min + 1; r < max; r++) if (gameMatrix[r][c1] !== 0) return false; return true; } return false; }
-    function checkLineWithOneCorner(r1, c1, r2, c2) { if (gameMatrix[r1][c2] === 0 || (r1===r2 && c1===c2)) { if (checkLine(r1, c1, r1, c2) && checkLine(r1, c2, r2, c2)) return { path: [{r:r1, c:c1}, {r:r1, c:c2}, {r:r2, c:c2}] }; } if (gameMatrix[r2][c1] === 0 || (r1===r2 && c1===c2)) { if (checkLine(r1, c1, r2, c1) && checkLine(r2, c1, r2, c2)) return { path: [{r:r1, c:c1}, {r:r2, c:c1}, {r:r2, c:c2}] }; } return { path: [] }; }
-    function checkLineWithTwoCorners(r1, c1, r2, c2) { for (let c = 0; c <= currentMode.COLS + 1; c++) { if (gameMatrix[r1][c] === 0 && gameMatrix[r2][c] === 0) { if (checkLine(r1, c1, r1, c) && checkLine(r2, c2, r2, c) && checkLine(r1, c, r2, c)) return { path: [{r:r1, c:c1}, {r:r1, c:c}, {r:r2, c:c}, {r:r2, c:c2}] }; } } for (let r = 0; r <= currentMode.ROWS + 1; r++) { if (gameMatrix[r][c1] === 0 && gameMatrix[r][c2] === 0) { if (checkLine(r1, c1, r, c1) && checkLine(r2, c2, r, c2) && checkLine(r, c1, r, c2)) return { path: [{r:r1, c:c1}, {r:r, c:c1}, {r:r, c:c2}, {r:r2, c:c2}] }; } } return { path: [] }; }
-    function drawPathLine(r1, c1, r2, c2) { const board = $('#game-board'); const sampleTile = $('.tile').first(); const s = sampleTile.outerWidth(true); for (let i = 0; i < foundPathCoords.length - 1; i++) { const pa = foundPathCoords[i]; const pb = foundPathCoords[i+1]; const x1 = (pa.c - 1) * s + s/2, y1 = (pa.r - 1) * s + s/2; const x2 = (pb.c - 1) * s + s/2, y2 = (pb.r - 1) * s + s/2; const len = Math.sqrt((x2-x1)**2 + (y2-y1)**2); const angle = Math.atan2(y2-y1, x2-x1) * 180 / Math.PI; const line = $('<div class="connector"></div>').css({ width: len + 'px', height: '4px', left: x1 + 'px', top: (y1 - 2) + 'px', transform: `rotate(${angle}deg)`, transformOrigin: '0 50%' }); board.append(line); } }
-    function useHint() { if (isProcessing || isPaused) return; if (score < HINT_COST) { SoundManager.playSfx('error'); showNotification(LANG[currentLang].notif_hint_cost); return; } const tiles = []; for (let r=1; r<=currentMode.ROWS; r++) for (let c=1; c<=currentMode.COLS; c++) if (gameMatrix[r][c] !== 0) tiles.push({r,c,t:gameMatrix[r][c]}); let move = null; for (let i=0; i<tiles.length; i++) for (let j=i+1; j<tiles.length; j++) if (tiles[i].t === tiles[j].t && checkPathForMove(tiles[i].r, tiles[i].c, tiles[j].r, tiles[j].c)) { move = [tiles[i], tiles[j]]; break; } if (move) { score -= HINT_COST; updateUI(); $(`.tile[data-r="${move[0].r}"][data-c="${move[0].c}"], .tile[data-r="${move[1].r}"][data-c="${move[1].c}"]`).addClass('hint-anim'); setTimeout(() => $('.tile').removeClass('hint-anim'), 2000); showNotification(LANG[currentLang].notif_hint_used); } else { showNotification(LANG[currentLang].notif_no_move); performShuffle(true); } }
-    function useShuffle() { if (isProcessing || isPaused) return; if (score < SHUFFLE_COST) { SoundManager.playSfx('error'); showNotification(LANG[currentLang].notif_shuffle_cost); return; } score -= SHUFFLE_COST; updateUI(); isProcessing = true; do { performShuffle(false); } while (!checkAnyMoveExists()); renderBoard(); showNotification(LANG[currentLang].notif_shuffle_used); isProcessing = false; checkEndGameOrShuffle(); }
-    function shiftTiles() { for (let c = 1; c <= currentMode.COLS; c++) { let colVals = []; for (let r = 1; r <= currentMode.ROWS; r++) if (gameMatrix[r][c] !== 0) colVals.push(gameMatrix[r][c]); const newCol = Array(currentMode.ROWS - colVals.length).fill(0).concat(colVals); for (let r = 1; r <= currentMode.ROWS; r++) gameMatrix[r][c] = newCol[r-1]; } renderBoard(); checkEndGameOrShuffle(); }
-    function checkEndGameOrShuffle() { let hasTile = false; for (let r=1; r<=currentMode.ROWS; r++) for (let c=1; c<=currentMode.COLS; c++) if (gameMatrix[r][c] !== 0) hasTile = true; if (!hasTile) { showEndGameModal('WIN'); return; } if (!checkAnyMoveExists()) { isProcessing = true; showNotification(LANG[currentLang].notif_no_move); do { performShuffle(false); } while (!checkAnyMoveExists()); renderBoard(); isProcessing = false; } }
-    function performShuffle(render = true) { let vals = []; for (let r=1; r<=currentMode.ROWS; r++) for (let c=1; c<=currentMode.COLS; c++) if (gameMatrix[r][c] !== 0) vals.push(gameMatrix[r][c]); vals.sort(() => Math.random() - 0.5); let idx = 0; for (let r=1; r<=currentMode.ROWS; r++) for (let c=1; c<=currentMode.COLS; c++) if (gameMatrix[r][c] !== 0) gameMatrix[r][c] = vals[idx++]; if (render) renderBoard(); }
-    function checkAnyMoveExists() { const tiles = []; for (let r=1; r<=currentMode.ROWS; r++) for (let c=1; c<=currentMode.COLS; c++) if (gameMatrix[r][c] !== 0) tiles.push({r,c,t:gameMatrix[r][c]}); for (let i=0; i<tiles.length; i++) { for (let j=i+1; j<tiles.length; j++) { if (tiles[i].t === tiles[j].t && checkPathForMove(tiles[i].r, tiles[i].c, tiles[j].r, tiles[j].c)) return true; } } return false; }
-    function checkPathForMove(r1, c1, r2, c2) { if (r1 === r2 && c1 === c2) return false; if (checkLine(r1, c1, r2, c2)) return true; if (checkLineWithOneCorner(r1, c1, r2, c2).path.length > 0) return true; if (checkLineWithTwoCorners(r1, c1, r2, c2).path.length > 0) return true; return false; }
+    function checkPath(r1, c1, r2, c2) { 
+        if (r1 === r2 && c1 === c2) return false; 
+        foundPathCoords = []; 
+        if (checkLine(r1, c1, r2, c2)) { foundPathCoords = [{r:r1, c:c1}, {r:r2, c:c2}]; return true; } 
+        let pathOne = checkLineWithOneCorner(r1, c1, r2, c2); if(pathOne.path.length > 0) { foundPathCoords = pathOne.path; return true; } 
+        let pathTwo = checkLineWithTwoCorners(r1, c1, r2, c2); if(pathTwo.path.length > 0) { foundPathCoords = pathTwo.path; return true; } 
+        return false; 
+    }
+    function checkLine(r1, c1, r2, c2) { 
+        if (r1 === r2) { const min = Math.min(c1, c2), max = Math.max(c1, c2); for (let c = min + 1; c < max; c++) if (gameMatrix[r1][c] !== 0) return false; return true; } 
+        if (c1 === c2) { const min = Math.min(r1, r2), max = Math.max(r1, r2); for (let r = min + 1; r < max; r++) if (gameMatrix[r][c1] !== 0) return false; return true; } 
+        return false; 
+    }
+    function checkLineWithOneCorner(r1, c1, r2, c2) { 
+        if (gameMatrix[r1][c2] === 0 || (r1===r2 && c1===c2)) { if (checkLine(r1, c1, r1, c2) && checkLine(r1, c2, r2, c2)) return { path: [{r:r1, c:c1}, {r:r1, c:c2}, {r:r2, c:c2}] }; } 
+        if (gameMatrix[r2][c1] === 0 || (r1===r2 && c1===c2)) { if (checkLine(r1, c1, r2, c1) && checkLine(r2, c1, r2, c2)) return { path: [{r:r1, c:c1}, {r:r2, c:c1}, {r:r2, c:c2}] }; } 
+        return { path: [] }; 
+    }
+    function checkLineWithTwoCorners(r1, c1, r2, c2) { 
+        for (let c = 0; c <= currentMode.COLS + 1; c++) { 
+            if (gameMatrix[r1][c] === 0 && gameMatrix[r2][c] === 0) { 
+                if (checkLine(r1, c1, r1, c) && checkLine(r2, c2, r2, c) && checkLine(r1, c, r2, c)) return { path: [{r:r1, c:c1}, {r:r1, c:c}, {r:r2, c:c}, {r:r2, c:c2}] }; 
+            } 
+        } 
+        for (let r = 0; r <= currentMode.ROWS + 1; r++) { 
+            if (gameMatrix[r][c1] === 0 && gameMatrix[r][c2] === 0) { 
+                if (checkLine(r1, c1, r, c1) && checkLine(r2, c2, r, c2) && checkLine(r, c1, r, c2)) return { path: [{r:r1, c:c1}, {r:r, c:c1}, {r:r, c:c2}, {r:r2, c:c2}] }; 
+            } 
+        } 
+        return { path: [] }; 
+    }
+    function drawPathLine(r1, c1, r2, c2) { 
+        const board = $('#game-board'); 
+        const sampleTile = $('.tile').first(); 
+        const s = sampleTile.outerWidth(true); 
+        for (let i = 0; i < foundPathCoords.length - 1; i++) { 
+            const pa = foundPathCoords[i]; 
+            const pb = foundPathCoords[i+1]; 
+            const x1 = (pa.c - 1) * s + s/2, y1 = (pa.r - 1) * s + s/2; 
+            const x2 = (pb.c - 1) * s + s/2, y2 = (pb.r - 1) * s + s/2; 
+            const len = Math.sqrt((x2-x1)**2 + (y2-y1)**2); 
+            const angle = Math.atan2(y2-y1, x2-x1) * 180 / Math.PI; 
+            const line = $('<div class="connector"></div>').css({ width: len + 'px', height: '4px', left: x1 + 'px', top: (y1 - 2) + 'px', transform: `rotate(${angle}deg)`, transformOrigin: '0 50%' }); 
+            board.append(line); 
+        } 
+    }
+    function useHint() { 
+        if (isProcessing || isPaused) return; 
+        if (score < HINT_COST) { SoundManager.playSfx('error'); showNotification(LANG[currentLang].notif_hint_cost); return; } 
+        const tiles = []; 
+        for (let r=1; r<=currentMode.ROWS; r++) for (let c=1; c<=currentMode.COLS; c++) if (gameMatrix[r][c] !== 0) tiles.push({r,c,t:gameMatrix[r][c]}); 
+        let move = null; 
+        for (let i=0; i<tiles.length; i++) for (let j=i+1; j<tiles.length; j++) if (tiles[i].t === tiles[j].t && checkPathForMove(tiles[i].r, tiles[i].c, tiles[j].r, tiles[j].c)) { move = [tiles[i], tiles[j]]; break; } 
+        if (move) { 
+            score -= HINT_COST; updateUI(); 
+            $(`.tile[data-r="${move[0].r}"][data-c="${move[0].c}"], .tile[data-r="${move[1].r}"][data-c="${move[1].c}"]`).addClass('hint-anim'); 
+            setTimeout(() => $('.tile').removeClass('hint-anim'), 2000); 
+            showNotification(LANG[currentLang].notif_hint_used); 
+        } else { 
+            showNotification(LANG[currentLang].notif_no_move); performShuffle(true); 
+        } 
+    }
+    function useShuffle() { 
+        if (isProcessing || isPaused) return; 
+        if (score < SHUFFLE_COST) { SoundManager.playSfx('error'); showNotification(LANG[currentLang].notif_shuffle_cost); return; } 
+        score -= SHUFFLE_COST; updateUI(); isProcessing = true; 
+        do { performShuffle(false); } while (!checkAnyMoveExists()); 
+        renderBoard(); showNotification(LANG[currentLang].notif_shuffle_used); isProcessing = false; checkEndGameOrShuffle(); 
+    }
+    function shiftTiles() { 
+        for (let c = 1; c <= currentMode.COLS; c++) { 
+            let colVals = []; 
+            for (let r = 1; r <= currentMode.ROWS; r++) if (gameMatrix[r][c] !== 0) colVals.push(gameMatrix[r][c]); 
+            const newCol = Array(currentMode.ROWS - colVals.length).fill(0).concat(colVals); 
+            for (let r = 1; r <= currentMode.ROWS; r++) gameMatrix[r][c] = newCol[r-1]; 
+        } 
+        renderBoard(); checkEndGameOrShuffle(); 
+    }
+    function checkEndGameOrShuffle() { 
+        let hasTile = false; 
+        for (let r=1; r<=currentMode.ROWS; r++) for (let c=1; c<=currentMode.COLS; c++) if (gameMatrix[r][c] !== 0) hasTile = true; 
+        if (!hasTile) { showEndGameModal('WIN'); return; } 
+        if (!checkAnyMoveExists()) { 
+            isProcessing = true; showNotification(LANG[currentLang].notif_no_move); 
+            do { performShuffle(false); } while (!checkAnyMoveExists()); 
+            renderBoard(); isProcessing = false; 
+        } 
+    }
+    function performShuffle(render = true) { 
+        let vals = []; 
+        for (let r=1; r<=currentMode.ROWS; r++) for (let c=1; c<=currentMode.COLS; c++) if (gameMatrix[r][c] !== 0) vals.push(gameMatrix[r][c]); 
+        vals.sort(() => Math.random() - 0.5); 
+        let idx = 0; 
+        for (let r=1; r<=currentMode.ROWS; r++) for (let c=1; c<=currentMode.COLS; c++) if (gameMatrix[r][c] !== 0) gameMatrix[r][c] = vals[idx++]; 
+        if (render) renderBoard(); 
+    }
+    function checkAnyMoveExists() { 
+        const tiles = []; 
+        for (let r=1; r<=currentMode.ROWS; r++) for (let c=1; c<=currentMode.COLS; c++) if (gameMatrix[r][c] !== 0) tiles.push({r,c,t:gameMatrix[r][c]}); 
+        for (let i=0; i<tiles.length; i++) { for (let j=i+1; j<tiles.length; j++) { if (tiles[i].t === tiles[j].t && checkPathForMove(tiles[i].r, tiles[i].c, tiles[j].r, tiles[j].c)) return true; } } 
+        return false; 
+    }
+    function checkPathForMove(r1, c1, r2, c2) { 
+        if (r1 === r2 && c1 === c2) return false; 
+        if (checkLine(r1, c1, r2, c2)) return true; 
+        if (checkLineWithOneCorner(r1, c1, r2, c2).path.length > 0) return true; 
+        if (checkLineWithTwoCorners(r1, c1, r2, c2).path.length > 0) return true; 
+        return false; 
+    }
 
     // >>> SỬA LỖI: CHẠY HÀM KIỂM TRA LƯU TRỮ VÀ CẬP NHẬT GIAO DIỆN SAU KHI TẤT CẢ CÁC HÀM ĐÃ ĐƯỢC ĐỊNH NGHĨA
     checkSavedGame();
@@ -474,23 +674,9 @@ $(document).ready(function() {
         // 1. Dùng hàm chung để ẩn Modal Overlay (Tất cả modal có class .modal-overlay)
         $('.modal-overlay').addClass('hidden'); 
         
-        // >>> SỬA LỖI: ĐẢM BẢO GAME TIẾP TỤC (RESUME) KHI ĐÓNG MODAL CÀI ĐẶT
-        // Nếu màn hình game đang hiển thị (chứng tỏ đang chơi), thì tiếp tục game
+        // Nếu đang ở màn hình game thì resume (nếu game chưa hết thời gian)
         if (!$('#game-screen').hasClass('hidden')) {
-            resumeGame(); // <--- DÒNG CODE QUAN TRỌNG ĐÃ ĐƯỢC THÊM/SỬA
-        }
-        
-        // 2. Logic tiếp tục game (chỉ cần chạy nếu đang ở màn hình game và game đang tạm dừng)
-        if (typeof isGameActive !== 'undefined' && isGameActive() && typeof timeRemaining !== 'undefined' && timeRemaining > 0) {
-            isPaused = false;
-            if (typeof startTimer === 'function') {
-                startTimer();
-            }
-        }
-        
-        // 3. Khôi phục nhạc nền (Nếu có hàm toggleBGM)
-        if (typeof toggleBGM === 'function' && typeof settings !== 'undefined') {
-            toggleBGM(settings.bgm);
+            resumeGame();
         }
     }
 });
